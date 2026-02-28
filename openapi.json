@@ -1,0 +1,1388 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "LYRA Services - Lyra",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://sandbox-dsp.malaysiaairlines.com/lyra",
+      "variables": {},
+      "x-env": "staging"
+    },
+    {
+      "url": "https://sandbox-dsp.malaysiaairlines.com/dev/lyra",
+      "variables": {},
+      "x-env": "development"
+    },
+    {
+      "url": "{localProtocol}://localhost:{localPort}",
+      "variables": {
+        "localPort": {
+          "default": "8080"
+        },
+        "localProtocol": {
+          "default": "http",
+          "enum": ["http", "https"]
+        }
+      },
+      "x-env": "local"
+    }
+  ],
+  "paths": {
+    "/config/flight/tasks": {
+      "get": {
+        "tags": ["Flight Tasks"],
+        "summary": "List flight tasks",
+        "description": "Returns flight tasks filtered by task type (Pre/Post) and aircraft type code (e.g., 738).",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "description": "Task type filter.",
+            "schema": {
+              "type": "string",
+              "enum": ["PRE", "POST"]
+            }
+          },
+          {
+            "name": "aircraftType",
+            "in": "query",
+            "required": true,
+            "description": "Aircraft type code (e.g., 738).",
+            "schema": {
+              "type": "string",
+              "example": "738"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with a list of flight tasks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "tasks": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/AircraftTypeFlightTask"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No tasks found for given filters.",
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      }
+    },
+    "/admin/config/flight/tasks": {
+      "summary": "Create a flight task action",
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CreateFlightTaskActionRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Action created successfully. Resources inserted only when completed=true",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateFlightTaskActionResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error (DB failure)",
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      }
+    },
+    "/flights/{flightId}/crew-checkin": {
+      "post": {
+        "summary": "Create crew check-in attendance or service contacts",
+        "description": "One-time submission per flight. If attendanceStatus=true, only an attendance record is created. If attendanceStatus=false, service contacts are created (constant info).",
+        "operationId": "createCrewCheckin",
+        "parameters": [
+          {
+            "name": "flightId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Flight identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrewCheckinRequest"
+              },
+              "examples": {
+                "checkInYes": {
+                  "summary": "Yes (check-in)",
+                  "value": {
+                    "attendanceStatus": true,
+                    "reason": null,
+                    "submittedAt": "2000-01-01T03:22:45Z"
+                  }
+                },
+                "checkInNo": {
+                  "summary": "No (deny/decline)",
+                  "value": {
+                    "attendanceStatus": false,
+                    "reason": "Unable to attend due to personal reasons",
+                    "submittedAt": "2000-01-01T03:22:45Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Crew check-in successfully submitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrewCheckinResponse"
+                },
+                "examples": {
+                  "created": {
+                    "summary": "Created",
+                    "value": {
+                      "data": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "$ref": "#/components/responses/Errors"
+          },
+          "409": {
+            "description": "Already submitted (one-time only)",
+            "$ref": "#/components/responses/Errors"
+          },
+          "500": {
+            "description": "Server error",
+            "$ref": "#/components/responses/Errors"
+          },
+          "default": {
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      }
+    },
+    "/flights/{flightid}/passengers": {
+      "summary": "Passenger list by flight id",
+      "parameters": [
+        {
+          "name": "flightid",
+          "in": "path",
+          "required": true,
+          "description": "flightid is a combined key of flight details",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "passengers": {
+                          "$ref": "#/components/schemas/Passengers"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "500": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "default": {
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      }
+    },
+    "/flights": {
+      "description": "Get flights assinged to the crew",
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlightList"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Flight not found",
+            "$ref": "#/components/responses/Errors"
+          },
+          "500": {
+            "description": "Internal Server Error - gRPC or Redis failure",
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      }
+    },
+    "/crew/profile": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "crew": {
+                          "$ref": "#/components/schemas/Crew"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "500": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "default": {
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      }
+    },
+    "/flights/{flightId}/seat-map": {
+      "get": {
+        "summary": "Retrieve Seat Map Data for a Flight",
+        "operationId": "getFlightSeatmap",
+        "parameters": [
+          {
+            "name": "flightId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "MH0628_2017-06-08_SIN"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Seat map retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "flightId": { "type": "string" },
+                    "flightInfo": { "type": "object" },
+                    "seatmap": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "502": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "500": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "default": {
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      }
+    },
+    "/flights/{flightId}/crew-positions": {
+      "get": {
+        "summary": "Get Crew Position",
+        "operationId": "getCrewPosition",
+        "description": "Fetch crew details associated with a specific flight, including the assigned position. Retrieves crew details from the flight_crew list API using flight_id, fetches assigned positions from flight_crew_position table, matches records by flight_id and crew_id, filters only active records, and merges crew and position data for the final response.",
+        "parameters": [
+          {
+            "name": "flightId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique identifier of the flight"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with crew positions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "crewPositions": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CrewPosition"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "500": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "default": {
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      }
+    },
+    "/config/flight/crew/positions": {
+      "get": {
+        "summary": "Get Crew Positions",
+        "operationId": "getCrewPositions",
+        "parameters": [
+          {
+            "name": "flightId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with available crew positions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "positions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "example": 12,
+                                "description": "Unique id for position"
+                              },
+                              "position": {
+                                "type": "string",
+                                "example": "CC",
+                                "description": "Crew position code (e.g., Cabin Crew)"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "500": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "default": {
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      }
+    },
+    "/auth/token": {
+      "post": {
+        "summary": "Issue Access token code",
+        "description": "Accepts an Azure Entra authorization code and returns a backend-issued JWT access token.",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthTokenRequest"
+              },
+              "example": {
+                "code": "0.AAAA-example-auth-code"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token issued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokenResponse"
+                },
+                "example": {
+                  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                  "tokenType": "Bearer",
+                  "expiresIn": 3600
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "500": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "default": {
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Remark": {
+        "type": "object",
+        "properties": {
+          "staffId": {
+            "type": "string",
+            "description": "Crew/staff identifier",
+            "example": "S12345"
+          },
+          "text": {
+            "type": "string",
+            "description": "Remark text",
+            "example": "test"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Remark creation date",
+            "example": "2024-08-01T00:00:00Z"
+          },
+          "status": {
+            "type": "string",
+            "description": "Remark status",
+            "example": "active"
+          }
+        }
+      },
+      "Remarks": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Remark"
+        }
+      },
+      "Events": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Event"
+        }
+      },
+      "Event": {
+        "type": "object",
+        "description": "Object use to identify the greeting details",
+        "properties": {
+          "event": {
+            "description": "Event help to identify the type of Greeting",
+            "type": "string",
+            "enum": ["BIRTHDAY"]
+          },
+          "message": {
+            "type": "string",
+            "example": "Happy Birthday!",
+            "description": "Event message text"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "event date"
+          }
+        }
+      },
+      "FrequentFlyer": {
+        "type": "object",
+        "description": "Frequent flyer details",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Frequent flyer membership ID",
+            "example": "7987989"
+          },
+          "airlineCode": {
+            "type": "string",
+            "description": "Airline code of the frequent flyer program",
+            "example": "MH"
+          },
+          "type": {
+            "type": "string",
+            "description": "Frequent flyer tier",
+            "example": "GOLD"
+          }
+        }
+      },
+      "SpecialServices": {
+        "type": "array",
+        "description": "List of special services requested",
+        "items": {
+          "$ref": "#/components/schemas/Service"
+        }
+      },
+      "Service": {
+        "type": "object",
+        "description": "Object use to identify the special service request details",
+        "required": ["code"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Special service request code",
+            "example": "MEAL"
+          },
+          "freeText": {
+            "type": "string",
+            "description": "Free-text description",
+            "example": "Non-veg meal"
+          }
+        }
+      },
+      "Passengers": {
+        "type": "array",
+        "description": "List of passengers (empty if no passenger)",
+        "items": {
+          "$ref": "#/components/schemas/Passenger"
+        }
+      },
+      "Passenger": {
+        "type": "object",
+        "required": ["uci", "name", "pnr", "bookingClassCode", "seatNo"],
+        "properties": {
+          "uci": {
+            "type": "string",
+            "description": "Unique Customer Identifier",
+            "example": "LKSJFLKAJSF"
+          },
+          "name": {
+            "type": "string",
+            "description": "Passenger name",
+            "example": "Jana"
+          },
+          "pnr": {
+            "type": "string",
+            "description": "Passenger Name Record (PNR)",
+            "example": "WBNQG"
+          },
+          "bookingClassCode": {
+            "type": "string",
+            "description": "Booking class code",
+            "example": "EYCL"
+          },
+          "seatNo": {
+            "type": "string",
+            "description": "Seat number assigned to the passenger",
+            "example": "12A"
+          },
+          "frequentFlyer": {
+            "$ref": "#/components/schemas/FrequentFlyer"
+          },
+          "SpecialServices": {
+            "$ref": "#/components/schemas/SpecialServices"
+          },
+          "events": {
+            "$ref": "#/components/schemas/Events"
+          },
+          "crewRemarks": {
+            "$ref": "#/components/schemas/Remarks"
+          }
+        }
+      },
+      "FlightList": {
+        "type": "object",
+        "required": ["data"],
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["flights"],
+            "properties": {
+              "flights": {
+                "type": "array",
+                "description": "List of flights, empty if no flights",
+                "items": {
+                  "$ref": "#/components/schemas/Flight"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Flight": {
+        "type": "object",
+        "required": [
+          "id",
+          "flightNumber",
+          "airlineCode",
+          "suffix",
+          "attendance",
+          "aircraft",
+          "dateUtc",
+          "date",
+          "departure",
+          "arrival",
+          "passengerCountBy"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique flight identifier"
+          },
+          "flightNumber": {
+            "type": "string",
+            "example": "2027"
+          },
+          "airlineCode": {
+            "type": "string",
+            "example": "MH"
+          },
+          "suffix": {
+            "type": "string",
+            "example": "D"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true,
+            "description": "Current flight status"
+          },
+          "attendance": {
+            "type": "object",
+            "nullable": true,
+            "required": ["status"],
+            "properties": {
+              "status": {
+                "type": "boolean",
+                "example": true
+              },
+              "remark": {
+                "type": "string",
+                "nullable": true,
+                "description": "Attendance remarks if status is false"
+              },
+              "submittedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true,
+                "example": "2026-01-16T14:32:45Z"
+              }
+            }
+          },
+          "aircraft": {
+            "type": "object",
+            "required": ["registration", "type"],
+            "properties": {
+              "registration": {
+                "type": "string",
+                "example": "BJH24332432BHJD",
+                "description": "Aircraft registration number"
+              },
+              "type": {
+                "type": "string",
+                "example": "MH",
+                "description": "Aircraft type/model"
+              }
+            }
+          },
+          "dateUtc": {
+            "type": "string",
+            "format": "date",
+            "example": "2024-08-01",
+            "description": "Flight date in UTC (YYYY-MM-DD)"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2024-08-01",
+            "description": "Local flight date (YYYY-MM-DD) "
+          },
+          "departure": {
+            "description": "Departure details of the flight",
+            "$ref": "#/components/schemas/FlightLeg"
+          },
+          "arrival": {
+            "description": "Arrival details of the flight",
+            "$ref": "#/components/schemas/FlightLeg"
+          },
+          "isDiverted": {
+            "type": "boolean",
+            "nullable": true,
+            "example": true
+          },
+          "passengerCountBy": {
+            "type": "object",
+            "required": ["type", "bookingClassCode"],
+            "properties": {
+              "type": {
+                "type": "object",
+                "required": ["adult", "child", "infant"],
+                "properties": {
+                  "adult": {
+                    "type": "integer",
+                    "example": 10,
+                    "description": "Adult passenger count"
+                  },
+                  "child": {
+                    "type": "integer",
+                    "example": 20,
+                    "description": "Child passenger count"
+                  },
+                  "infant": {
+                    "type": "integer",
+                    "example": 20,
+                    "description": "Infant passenger count"
+                  }
+                }
+              },
+              "bookingClassCode": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "example": {
+                  "BSCL": 60,
+                  "BCL": 80,
+                  "EYCL": 90
+                }
+              }
+            }
+          }
+        }
+      },
+      "FlightLeg": {
+        "type": "object",
+        "required": [
+          "scheduleUtc",
+          "schedule",
+          "estimatedUtc",
+          "estimated",
+          "actualUtc",
+          "actual",
+          "station"
+        ],
+        "properties": {
+          "gate": {
+            "type": "string",
+            "nullable": true,
+            "example": "G1",
+            "description": "Gate number"
+          },
+          "scheduleUtc": {
+            "type": "string",
+            "example": "2024-08-01",
+            "description": "Schedule date in UTC"
+          },
+          "schedule": {
+            "type": "string",
+            "example": "2024-08-01",
+            "description": "Schedule local date"
+          },
+          "estimatedUtc": {
+            "type": "string",
+            "example": "2024-08-01",
+            "description": "Estimated date in UTC"
+          },
+          "estimated": {
+            "type": "string",
+            "example": "2024-08-01",
+            "description": "Estimated local date"
+          },
+          "actualUtc": {
+            "type": "string",
+            "example": "2024-08-01",
+            "description": "Actual date in UTC"
+          },
+          "actual": {
+            "type": "string",
+            "example": "2024-08-01",
+            "description": "Actual local date"
+          },
+          "station": {
+            "$ref": "#/components/schemas/Station"
+          }
+        }
+      },
+      "Station": {
+        "type": "object",
+        "required": [
+          "city",
+          "name",
+          "iata",
+          "icao",
+          "countryCode",
+          "countryName"
+        ],
+        "properties": {
+          "city": {
+            "type": "string",
+            "example": "Kuala Lumpur",
+            "description": "City name"
+          },
+          "name": {
+            "type": "string",
+            "example": "Kuala Lumpur International Airport",
+            "description": "Airport Name"
+          },
+          "iata": {
+            "type": "string",
+            "example": "KUL",
+            "description": "IATA code"
+          },
+          "icao": {
+            "type": "string",
+            "example": "WMKK",
+            "description": "ICAO code"
+          },
+          "countryCode": {
+            "type": "string",
+            "example": "MY",
+            "description": "Country code"
+          },
+          "countryName": {
+            "type": "string",
+            "example": "Malaysia",
+            "description": "Country name"
+          }
+        }
+      },
+      "Crew": {
+        "type": "object",
+        "properties": {
+          "initials": {
+            "type": "string",
+            "example": "HA",
+            "description": "Staff name initials, derived from first letter of firstname + first letter of lastname."
+          },
+          "firstName": {
+            "type": "string",
+            "example": "HARYANI BINTI",
+            "description": "Staff first name(s)."
+          },
+          "lastName": {
+            "type": "string",
+            "example": "ABDUL RAHIM",
+            "description": "Staff last name."
+          },
+          "rank": {
+            "type": "string",
+            "example": "IFS",
+            "description": "Staff rank or designation."
+          },
+          "staffId": {
+            "type": "string",
+            "example": "2110826",
+            "description": "Unique staff identifier."
+          },
+          "passport": {
+            "type": "object",
+            "description": "Passport details of staff (present only if docType = 'P').",
+            "properties": {
+              "number": {
+                "type": "string",
+                "example": "A32882438",
+                "description": "Passport number."
+              },
+              "issuingCountry": {
+                "type": "string",
+                "example": "MYS",
+                "description": "Document issuing country."
+              },
+              "issuingDate": {
+                "type": "string",
+                "example": "2014-06-05",
+                "description": "Document issue date."
+              },
+              "expiryDate": {
+                "type": "string",
+                "example": "2019-12-05",
+                "description": "Passport expiry date."
+              }
+            }
+          },
+          "country": {
+            "type": "string",
+            "example": "MYS",
+            "description": "Country code."
+          },
+          "license": {
+            "type": "object",
+            "description": "Official license document information (present only if docType = 'L').",
+            "properties": {
+              "number": {
+                "type": "string",
+                "example": "A32882438",
+                "description": "License number."
+              },
+              "issuingCountry": {
+                "type": "string",
+                "example": "MYS",
+                "description": "License issuing country."
+              },
+              "issuingDate": {
+                "type": "string",
+                "example": "2014-06-05",
+                "description": "License issue date."
+              },
+              "expiryDate": {
+                "type": "string",
+                "example": "2019-12-05",
+                "description": "License expiry date."
+              }
+            }
+          },
+          "gender": {
+            "type": "string",
+            "example": "F",
+            "description": "Gender of staff (M / F / O)."
+          }
+        }
+      },
+      "AircraftTypeFlightTask": {
+        "type": "object",
+        "description": "An aircraft type flight task record",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique Aircraft Type Flight Task Identifier",
+            "example": 42
+          },
+          "taskId": {
+            "type": "integer",
+            "description": "Unique Task Identifier",
+            "example": 42
+          },
+          "aircraftType": {
+            "type": "string",
+            "description": "Aircraft Type ",
+            "example": "A330"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["PRE", "POST"],
+            "description": "Task type",
+            "example": "PRE"
+          },
+          "name": {
+            "type": "string",
+            "description": "Task name",
+            "example": "AIC (Aircraft Interior Cleaning) completed"
+          },
+          "helpText": {
+            "type": "string",
+            "nullable": true,
+            "description": "Help text",
+            "example": "Not Available"
+          },
+          "crewType": {
+            "type": "string",
+            "description": "Crew Type with default CC",
+            "example": "CC"
+          },
+          "displayOrder": {
+            "type": "integer",
+            "description": "Display Order of the task",
+            "example": 1
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Status",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "aircraftType",
+          "type",
+          "name",
+          "crewType",
+          "displayOrder",
+          "isActive"
+        ]
+      },
+      "AuthTokenRequest": {
+        "type": "object",
+        "required": ["code", "codeVerifier"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Authorization code received from Azure Entra",
+            "example": "0.AAAA-example-auth-code"
+          },
+          "codeVerifier": {
+            "type": "string",
+            "description": "PKCE Code verifier used in the initial authorization request to Azure Entra, 43-128 characters",
+            "example": "aasdfsafdsafdasfsadfasdfsadfdsfdsfsdfdsfdsf.."
+          }
+        }
+      },
+      "AuthTokenResponse": {
+        "type": "object",
+        "required": ["accessToken", "tokenType", "expiresIn"],
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT access token",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "tokenType": {
+            "type": "string",
+            "example": "Bearer"
+          },
+          "expiresIn": {
+            "type": "integer",
+            "description": "Token expiry time in seconds",
+            "example": 3600
+          }
+        }
+      },
+      "CreateFlightTaskActionRequest": {
+        "type": "object",
+        "description": "For Flight Task Action Request",
+        "properties": {
+          "flightTaskId": {
+            "type": "integer",
+            "description": "Unique Flight Task identifier",
+            "example": 45
+          },
+          "flightId": {
+            "type": "string",
+            "description": "Unique Flight Id",
+            "example": "A330"
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "The completion status",
+            "example": true
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "The name of created by",
+            "example": "admin"
+          },
+          "remark": {
+            "type": "string",
+            "description": "Remark",
+            "example": "Resource of water and waste",
+            "nullable": true
+          },
+          "flightTaskActionValue": {
+            "type": "array",
+            "description": "The flight task action value (if any)",
+            "items": {
+              "$ref": "#/components/schemas/FlightTaskActionValuesInput"
+            },
+            "nullable": true
+          }
+        },
+        "required": ["flightTaskId", "flightId", "completed", "createdBy"]
+      },
+      "FlightTaskActionValuesInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Type of flight task action values input",
+            "example": "Water level"
+          },
+          "value": {
+            "type": "integer",
+            "description": "Value of flight task input",
+            "example": 50
+          }
+        },
+        "required": ["type"]
+      },
+      "FlightTaskActionValues": {
+        "type": "object",
+        "description": "The Flight Task Action Values",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique Flight Task Action Values Identifier",
+            "example": 1
+          },
+          "actionId": {
+            "type": "integer",
+            "description": "Action Id",
+            "example": 1
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of flight task action values input",
+            "example": "Water level"
+          },
+          "value": {
+            "type": "integer",
+            "description": "Type of flight task action values input",
+            "example": 50
+          }
+        }
+      },
+      "TaskItem": {
+        "type": "object",
+        "description": "Task Item for Flight Task Action",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique Flight Task Action Identifier",
+            "example": 1
+          },
+          "flightTaskId": {
+            "type": "integer",
+            "description": "Unique Flight Task Identifier",
+            "example": 1
+          },
+          "flightId": {
+            "type": "string",
+            "description": "Flight Id",
+            "example": "A330"
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "The completion status",
+            "example": true
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "The name of created by",
+            "example": "admin"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Remark creation date",
+            "example": "2024-08-01T00:00:00Z"
+          },
+          "remark": {
+            "type": "string",
+            "description": "Remark",
+            "example": "Resource of water and waste",
+            "nullable": true
+          },
+          "flightTaskActionValue": {
+            "type": "array",
+            "description": "The flight task action value (if any)",
+            "items": { "$ref": "#/components/schemas/FlightTaskActionValues" },
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "flightTaskId",
+          "flightId",
+          "completed",
+          "createdBy",
+          "createdAt"
+        ]
+      },
+      "CreateFlightTaskActionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "tasks": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/TaskItem" }
+              }
+            },
+            "required": ["tasks"]
+          }
+        },
+        "required": ["data"]
+      },
+      "CrewPosition": {
+        "type": "object",
+        "description": "Crew member details enriched with assigned position and responsibilities",
+        "properties": {
+          "rank": {
+            "type": "string",
+            "description": "Crew rank or designation (e.g., CAPT, FO, SO)"
+          },
+          "staffId": {
+            "type": "string",
+            "description": "Unique staff identifier"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "Crew member first name"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Crew member last name"
+          },
+          "documentAlerts": {
+            "type": "array",
+            "description": "List of document alerts for the crew member",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "string",
+                  "description": "Document number"
+                },
+                "expiryDate": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Document expiry date"
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Document validity status. GREEN: Expiry >= 12 months, AMBER: Expiry between 8-12 months, RED: Expiry < 8 months"
+                },
+                "remarks": {
+                  "type": "string",
+                  "description": "Document status remarks"
+                },
+                "docType": {
+                  "type": "string",
+                  "description": "Document type (e.g., P = Passport)"
+                }
+              }
+            }
+          },
+          "position": {
+            "type": "string",
+            "description": "Assigned crew position"
+          },
+          "responsibility": {
+            "type": "string",
+            "description": "Crew responsibility description"
+          }
+        }
+      },
+      "CrewCheckinRequest": {
+        "type": "object",
+        "properties": {
+          "attendanceStatus": {
+            "type": "boolean",
+            "description": "True = create attendance (reason must be null); False = create attendance (reason required)"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 100,
+            "nullable": true
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["attendanceStatus", "submittedAt"]
+      },
+      "CrewCheckinResponse": {
+        "type": "object",
+        "properties": {
+          "data": { "$ref": "#/components/schemas/CrewCheckinResponseData" }
+        },
+        "required": ["data"]
+      },
+      "CrewCheckinResponseData": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "attendanceStatus": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 100,
+            "nullable": true
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "attendanceStatus", "submittedAt"]
+      }
+    },
+    "responses": {
+      "Errors": {
+        "$ref": "../refs.json#/components/responses/Errors"
+      }
+    }
+  }
+}
