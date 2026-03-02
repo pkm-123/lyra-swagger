@@ -465,6 +465,52 @@
           }
         }
       }
+    },
+    "/auth/token": {
+      "post": {
+        "summary": "Issue Access token code",
+        "description": "Accepts an Azure Entra authorization code and returns a backend-issued JWT access token.",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthTokenRequest"
+              },
+              "example": {
+                "code": "0.AAAA-example-auth-code"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token issued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokenResponse"
+                },
+                "example": {
+                  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                  "tokenType": "Bearer",
+                  "expiresIn": 3600
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "500": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "default": {
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1032,6 +1078,42 @@
           "displayOrder",
           "isActive"
         ]
+      },
+      "AuthTokenRequest": {
+        "type": "object",
+        "required": ["code", "codeVerifier"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Authorization code received from Azure Entra",
+            "example": "0.AAAA-example-auth-code"
+          },
+          "codeVerifier": {
+            "type": "string",
+            "description": "PKCE Code verifier used in the initial authorization request to Azure Entra, 43-128 characters",
+            "example": "aasdfsafdsafdasfsadfasdfsadfdsfdsfsdfdsfdsf.."
+          }
+        }
+      },
+      "AuthTokenResponse": {
+        "type": "object",
+        "required": ["accessToken", "tokenType", "expiresIn"],
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT access token",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "tokenType": {
+            "type": "string",
+            "example": "Bearer"
+          },
+          "expiresIn": {
+            "type": "integer",
+            "description": "Token expiry time in seconds",
+            "example": 3600
+          }
+        }
       },
       "CreateFlightTaskActionRequest": {
         "type": "object",
