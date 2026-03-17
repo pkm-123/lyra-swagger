@@ -4,6 +4,11 @@
     "title": "LYRA Services - Lyra",
     "version": "1.0.0"
   },
+  "security": [
+    {
+      "HeaderBearerToken": []
+    }
+  ],
   "servers": [
     {
       "url": "https://sandbox-dsp.malaysiaairlines.com/lyra",
@@ -331,26 +336,23 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "flightId": { "type": "string" },
-                    "flightInfo": { "type": "object" },
-                    "seatmap": { "type": "object" }
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "seatMap": {
+                          "type": "object"
+                        }
+                      }
+                    }
                   }
                 }
               }
             }
           },
-          "404": {
-            "$ref": "#/components/responses/Errors"
-          },
-          "502": {
-            "$ref": "#/components/responses/Errors"
-          },
-          "500": {
-            "$ref": "#/components/responses/Errors"
-          },
-          "default": {
-            "$ref": "#/components/responses/Errors"
-          }
+          "404": { "$ref": "#/components/responses/Errors" },
+          "502": { "$ref": "#/components/responses/Errors" },
+          "500": { "$ref": "#/components/responses/Errors" },
+          "default": { "$ref": "#/components/responses/Errors" }
         }
       }
     },
@@ -359,14 +361,13 @@
         "summary": "Get Crew Position",
         "operationId": "getCrewPosition",
         "description": "Fetch crew details associated with a specific flight, including the assigned position. Retrieves crew details from the flight_crew list API using flight_id, fetches assigned positions from flight_crew_position table, matches records by flight_id and crew_id, filters only active records, and merges crew and position data for the final response.",
+        "tags": ["Crew Positions"],
         "parameters": [
           {
             "name": "flightId",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "string"
-            },
+            "schema": { "type": "string" },
             "description": "Unique identifier of the flight"
           }
         ],
@@ -394,15 +395,62 @@
               }
             }
           },
-          "404": {
-            "$ref": "#/components/responses/Errors"
-          },
-          "500": {
-            "$ref": "#/components/responses/Errors"
-          },
-          "default": {
-            "$ref": "#/components/responses/Errors"
+          "404": { "description": "Flight or crew positions not found" }
+        }
+      },
+      "post": {
+        "summary": "Assign Crew Position",
+        "operationId": "assignCrewPosition",
+        "description": "Assign a crew member to a specific position for a given flight. Saves the crew position assignment in the flight_crew_position table and sets the record as active.",
+        "tags": ["Crew Positions"],
+        "parameters": [
+          {
+            "name": "flightId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Unique identifier of the flight"
           }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "positionId": {
+                    "type": "integer",
+                    "example": 12,
+                    "description": "Unique ID of the crew position "
+                  },
+                  "staffId": {
+                    "type": "string",
+                    "example": "2104915",
+                    "description": "Unique staff identifier "
+                  }
+                },
+                "required": ["positionId", "staffId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Crew position successfully assigned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrewPositionAssignment"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "404": { "$ref": "#/components/responses/Errors" },
+          "500": { "$ref": "#/components/responses/Errors" },
+          "default": { "$ref": "#/components/responses/Errors" }
         }
       }
     },
@@ -410,6 +458,7 @@
       "get": {
         "summary": "Get Crew Positions",
         "operationId": "getCrewPositions",
+        "tags": ["Crew Positions"],
         "parameters": [
           {
             "name": "flightId",
@@ -502,6 +551,62 @@
           },
           "401": {
             "$ref": "#/components/responses/Errors"
+          },
+          "500": {
+            "$ref": "#/components/responses/Errors"
+          },
+          "default": {
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      }
+    },
+    "/flights/{flightId}/passenger-remarks": {
+      "post": {
+        "summary": "Add passenger remarks",
+        "description": "Accepts a list of passengers with remarks, saves them, and returns consolidated status.",
+        "tags": ["Flights"],
+        "parameters": [
+          {
+            "name": "flightId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique identifier for the flight"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PassengerRemarksRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "All records saved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PassengerRemarksResponse"
+                }
+              }
+            }
+          },
+          "207": {
+            "description": "Partial success - some records failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PassengerRemarksResponse"
+                }
+              }
+            }
           },
           "500": {
             "$ref": "#/components/responses/Errors"
@@ -1377,11 +1482,192 @@
           }
         },
         "required": ["id", "attendanceStatus", "submittedAt"]
+      },
+      "CrewPositionAssignment": {
+        "type": "object",
+        "description": "Represents the result of assigning a crew member to a position for a flight. Contains the assigned position ID, staff ID, and the unique assignment record ID.",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "positionId": {
+                "type": "integer",
+                "example": 12,
+                "description": "Unique ID of the crew position"
+              },
+              "staffId": {
+                "type": "string",
+                "example": "2104915",
+                "description": "Unique staff identifier"
+              },
+              "id": {
+                "type": "integer",
+                "example": 102,
+                "description": "Unique ID generated for the flight crew position assignment"
+              }
+            }
+          }
+        }
+      },
+      "PassengerRemark": {
+        "type": "object",
+        "description": "A single remark submitted for a passenger.",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Remark text. Maps to passenger_remarks.remarks."
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the remark was submitted by crew/staff. Maps to passenger_remarks.submitted_at."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["success", "fail"],
+            "description": "Save outcome for this remark (used in response)."
+          }
+        },
+        "required": ["text", "submittedAt"]
+      },
+      "PassengerRemarksRequest": {
+        "type": "object",
+        "description": "Request payload containing passengers and their remarks.",
+        "properties": {
+          "passengers": {
+            "type": "array",
+            "description": "List of passengers with remarks to be saved.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uci": {
+                  "type": "string",
+                  "description": "Unique Customer Identifier for the passenger."
+                },
+                "remarks": {
+                  "type": "array",
+                  "description": "List of remarks submitted for this passenger.",
+                  "items": {
+                    "$ref": "#/components/schemas/PassengerRemark"
+                  }
+                }
+              },
+              "required": ["uci", "remarks"]
+            }
+          }
+        },
+        "required": ["passengers"]
+      },
+      "PassengerRemarksResponse": {
+        "type": "object",
+        "description": "Response payload summarizing save results for passenger remarks.",
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "Consolidated response data.",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["SUCCESS", "PARTIAL_SUCCESS", "FAILED"],
+                "description": "Overall save status across all remarks."
+              },
+              "summary": {
+                "type": "object",
+                "description": "Aggregated counts of passengers and remarks processed.",
+                "properties": {
+                  "totalPassengers": { "type": "integer" },
+                  "totalRemarks": { "type": "integer" },
+                  "saved": { "type": "integer" },
+                  "failed": { "type": "integer" }
+                }
+              },
+              "passengers": {
+                "type": "array",
+                "description": "Detailed per-passenger save status.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "uci": {
+                      "type": "string",
+                      "description": "Passenger identifier."
+                    },
+                    "remarks": {
+                      "type": "array",
+                      "description": "Remarks with save status for this passenger.",
+                      "items": {
+                        "$ref": "#/components/schemas/PassengerRemark"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "required": ["status", "summary", "passengers"]
+          }
+        },
+        "required": ["data"]
       }
     },
     "responses": {
+      "BadRequest": {
+        "description": "Invalid request body or missing parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "errors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "code": { "type": "integer", "example": 400 },
+                      "message": {
+                        "type": "string",
+                        "example": "Missing required fields: positionId, staffId, flightId"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Position already assigned to another user",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "errors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "code": { "type": "integer", "example": 900409 },
+                      "message": {
+                        "type": "string",
+                        "example": "This position is already assigned to another user."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "Errors": {
         "$ref": "../refs.json#/components/responses/Errors"
+      }
+    },
+    "securitySchemes": {
+      "HeaderBearerToken": {
+        "description": "Bearer token is required in header to access the API.",
+        "type": "http",
+        "scheme": "bearer"
       }
     }
   }
