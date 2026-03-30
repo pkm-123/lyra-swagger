@@ -11,9 +11,9 @@
   ],
   "servers": [
     {
-      "url": "https://sandbox-dsp.malaysiaairlines.com/lyra",
+      "url": "https://sandbox-dsp.malaysiaairlines.com/sit/lyra",
       "variables": {},
-      "x-env": "staging"
+      "x-env": "sit"
     },
     {
       "url": "https://sandbox-dsp.malaysiaairlines.com/dev/lyra",
