@@ -11,14 +11,19 @@
   ],
   "servers": [
     {
-      "url": "https://sandbox-dsp.malaysiaairlines.com/sit/lyra",
+      "url": "https://sandbox-dsp.malaysiaairlines.com/lyra",
       "variables": {},
-      "x-env": "sit"
+      "x-env": "staging"
     },
     {
       "url": "https://sandbox-dsp.malaysiaairlines.com/dev/lyra",
       "variables": {},
       "x-env": "development"
+    },
+    {
+      "url": "https://sandbox-dsp.malaysiaairlines.com/sit/lyra",
+      "variables": {},
+      "x-env": "sit"
     },
     {
       "url": "{localProtocol}://localhost:{localPort}",
@@ -93,18 +98,133 @@
         }
       }
     },
-    "/admin/config/flight/tasks": {
-      "summary": "Create a flight task action",
+    "/flights/{flightId}/tasks": {
+      "parameters": [
+        {
+          "name": "flightId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Flight identifier"
+        }
+      ],
+      "get": {
+        "tags": ["Flight Tasks"],
+        "operationId": "getFlightTask",
+        "summary": "List flight tasks with Action",
+        "description": "Fetches the list of pre-flight or post-flight tasks configured for a specific aircraft type and Action saved for flightid . ",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "description": "Task type filter.",
+            "schema": {
+              "type": "string",
+              "enum": ["PRE", "POST"]
+            }
+          },
+          {
+            "name": "crewType",
+            "in": "query",
+            "required": false,
+            "description": "Crew type filter.",
+            "schema": {
+              "type": "string",
+              "enum": ["CC", "FC"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with a list of flight tasks with action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlightTasksResponse"
+                },
+                "examples": {
+                  "sample": {
+                    "summary": "A sample response",
+                    "value": {
+                      "data": {
+                        "tasks": [
+                          {
+                            "id": 42,
+                            "taskId": 42,
+                            "aircraftType": "A330",
+                            "type": "PRE",
+                            "name": "AIC (Aircraft Interior Cleaning) completed",
+                            "helpText": "Not Available",
+                            "crewType": "CC",
+                            "displayOrder": 1,
+                            "completed": true,
+                            "createdBy": "admin",
+                            "completedAt": "2026-04-01T10:30:00.000Z",
+                            "remarks": [
+                              {
+                                "remark": "Clicked by mistake",
+                                "completedAt": "2026-04-01T10:30:00.000Z"
+                              }
+                            ],
+                            "flightTaskAction": [
+                              {
+                                "type": "Water level",
+                                "value": 50
+                              },
+                              {
+                                "type": "Waste level",
+                                "value": 50
+                              }
+                            ]
+                          }
+                        ],
+                        "isCabinReady": false,
+                        "isCockpitReady": false,
+                        "isBoardingReady": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "$ref": "#/components/responses/Errors"
+          },
+          "404": {
+            "description": "No tasks found for given filters.",
+            "$ref": "#/components/responses/Errors"
+          },
+          "500": {
+            "description": "An unexpected error occurred while fetching the access matrix",
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      },
       "post": {
+        "summary": "Save flight tasks with Action",
+        "description": "Save the list of pre-flight or post-flight tasks Action for flightid . ",
+        "tags": ["Flight Tasks"],
+        "operationId": "saveFlightTaskAction",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/CreateFlightTaskActionRequest"
-                }
+                "type": "object",
+                "properties": {
+                  "tasks": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/CreateFlightTaskActionRequest"
+                    }
+                  }
+                },
+                "required": ["tasks"]
               }
             }
           }
@@ -119,6 +239,10 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Flight not found",
+            "$ref": "#/components/responses/Errors"
           },
           "500": {
             "description": "Internal server error (DB failure)",
@@ -395,7 +519,7 @@
               }
             }
           },
-          "404": { "description": "Flight or crew positions not found" }
+          "404": { "$ref": "#/components/responses/Errors" }
         }
       },
       "post": {
@@ -528,7 +652,9 @@
                 "$ref": "#/components/schemas/AuthTokenRequest"
               },
               "example": {
-                "code": "0.AAAA-example-auth-code"
+                "code": "0.AAAA-example-auth-code",
+                "codeVerifier": "1.sfhjsd.....",
+                "redirectUri": "lyra://oauth2redirect"
               }
             }
           }
@@ -607,6 +733,62 @@
                 }
               }
             }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/responses/Errors"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Errors"
+          }
+        }
+      }
+    },
+    "/flights/{flightId}/crew-positions/{positionId}": {
+      "delete": {
+        "summary": "Unassign Position",
+        "operationId": "unassignCrewPosition",
+        "description": "Unassign a specific crew position from the Lyra app. After deletion, the position will no longer appear in the Get Crew Position API response.",
+        "tags": ["Crew Positions"],
+        "parameters": [
+          {
+            "name": "flightId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Unique identifier of the flight"
+          },
+          {
+            "name": "positionId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Unique identifier of the crew position to unassign"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object" }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Position successfully unassigned"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/Errors"
           },
           "500": {
             "$ref": "#/components/responses/Errors"
@@ -724,6 +906,21 @@
           }
         }
       },
+      "title": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Passenger title name",
+            "example": "Mr."
+          },
+          "description": {
+            "type": "string",
+            "description": "Passenger title description",
+            "example": "Mister"
+          }
+        }
+      },
       "Passengers": {
         "type": "array",
         "description": "List of passengers (empty if no passenger)",
@@ -771,6 +968,12 @@
           },
           "crewRemarks": {
             "$ref": "#/components/schemas/Remarks"
+          },
+          "meals": {
+            "$ref": "#/components/schemas/SpecialServices"
+          },
+          "title": {
+            "$ref": "#/components/schemas/title"
           }
         }
       },
@@ -806,7 +1009,8 @@
           "date",
           "departure",
           "arrival",
-          "passengerCountBy"
+          "passengerCountBy",
+          "totalSeatCapacity"
         ],
         "properties": {
           "id": {
@@ -829,6 +1033,11 @@
             "type": "string",
             "nullable": true,
             "description": "Current flight status"
+          },
+          "baggageCarousel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Baggage carousel number"
           },
           "attendance": {
             "type": "object",
@@ -928,8 +1137,43 @@
                   "BCL": 80,
                   "EYCL": 90
                 }
+              },
+              "connections": {
+                "type": "object",
+                "properties": {
+                  "onward": {
+                    "type": "integer",
+                    "example": 77,
+                    "description": "Onward connection count"
+                  },
+                  "inward": {
+                    "type": "integer",
+                    "example": 0,
+                    "description": "Inward connection count"
+                  }
+                }
+              },
+              "specialService": {
+                "type": "object",
+                "properties": {
+                  "meal": {
+                    "type": "integer",
+                    "example": 94,
+                    "description": "Special meal service count"
+                  },
+                  "handling": {
+                    "type": "integer",
+                    "example": 0,
+                    "description": "Special handling service count"
+                  }
+                }
               }
             }
+          },
+          "totalSeatCapacity": {
+            "type": "integer",
+            "description": "Total seat capacity across all classes",
+            "example": 174
           }
         }
       },
@@ -1186,7 +1430,7 @@
       },
       "AuthTokenRequest": {
         "type": "object",
-        "required": ["code", "codeVerifier"],
+        "required": ["code", "redirectUri"],
         "properties": {
           "code": {
             "type": "string",
@@ -1197,6 +1441,11 @@
             "type": "string",
             "description": "PKCE Code verifier used in the initial authorization request to Azure Entra, 43-128 characters",
             "example": "aasdfsafdsafdasfsadfasdfsadfdsfdsfsdfdsfdsf.."
+          },
+          "redirectUri": {
+            "type": "string",
+            "description": "Redirect url",
+            "example": "lyra://oauth2redirect"
           }
         }
       },
@@ -1229,28 +1478,24 @@
             "description": "Unique Flight Task identifier",
             "example": 45
           },
-          "flightId": {
-            "type": "string",
-            "description": "Unique Flight Id",
-            "example": "A330"
-          },
           "completed": {
             "type": "boolean",
             "description": "The completion status",
             "example": true
           },
-          "createdBy": {
+          "completedAt": {
             "type": "string",
-            "description": "The name of created by",
-            "example": "admin"
+            "format": "date-time",
+            "description": "Completion date",
+            "example": "2024-08-01T00:00:00Z"
           },
-          "remark": {
+          "remarks": {
             "type": "string",
             "description": "Remark",
             "example": "Resource of water and waste",
             "nullable": true
           },
-          "flightTaskActionValue": {
+          "flightTaskAction": {
             "type": "array",
             "description": "The flight task action value (if any)",
             "items": {
@@ -1259,7 +1504,12 @@
             "nullable": true
           }
         },
-        "required": ["flightTaskId", "flightId", "completed", "createdBy"]
+        "required": [
+          "flightTaskId",
+          "completed",
+          "completedAt",
+          "flightTaskAction"
+        ]
       },
       "FlightTaskActionValuesInput": {
         "type": "object",
@@ -1277,20 +1527,10 @@
         },
         "required": ["type"]
       },
-      "FlightTaskActionValues": {
+      "PostFlightTaskActionResponse": {
         "type": "object",
         "description": "The Flight Task Action Values",
         "properties": {
-          "id": {
-            "type": "integer",
-            "description": "Unique Flight Task Action Values Identifier",
-            "example": 1
-          },
-          "actionId": {
-            "type": "integer",
-            "description": "Action Id",
-            "example": 1
-          },
           "type": {
             "type": "string",
             "description": "Type of flight task action values input",
@@ -1338,16 +1578,18 @@
             "description": "Remark creation date",
             "example": "2024-08-01T00:00:00Z"
           },
-          "remark": {
+          "remarks": {
             "type": "string",
             "description": "Remark",
             "example": "Resource of water and waste",
             "nullable": true
           },
-          "flightTaskActionValue": {
+          "flightTaskAction": {
             "type": "array",
             "description": "The flight task action value (if any)",
-            "items": { "$ref": "#/components/schemas/FlightTaskActionValues" },
+            "items": {
+              "$ref": "#/components/schemas/PostFlightTaskActionResponse"
+            },
             "nullable": true
           }
         },
@@ -1375,6 +1617,160 @@
           }
         },
         "required": ["data"]
+      },
+      "FlightTasksResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "tasks": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AircraftFlightTask"
+                }
+              },
+              "isCabinReady": {
+                "type": "boolean",
+                "description": "Status of the Cabin Ready from ICC",
+                "example": false
+              },
+              "isCockpitReady": {
+                "type": "boolean",
+                "description": "Status of the Cockpit Ready from Flight Crew",
+                "example": false
+              },
+              "isBoardingReady": {
+                "type": "boolean",
+                "description": "Status of the Borading Ready from Flight Crew",
+                "example": false
+              }
+            }
+          }
+        }
+      },
+      "AircraftFlightTask": {
+        "type": "object",
+        "description": "The flight task record.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique task identifier",
+            "example": 42
+          },
+          "taskId": {
+            "type": "integer",
+            "description": "Task reference ID ",
+            "example": 42
+          },
+          "aircraftType": {
+            "type": "string",
+            "description": "Aircraft Type",
+            "example": "330"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["PRE", "POST"],
+            "description": "Task type",
+            "example": "PRE"
+          },
+          "name": {
+            "type": "string",
+            "description": "Task name",
+            "example": "AIC (Aircraft Interior Cleaning) completed"
+          },
+          "helpText": {
+            "type": "string",
+            "nullable": true,
+            "description": "Help or guidance text",
+            "example": "Not available"
+          },
+          "crewType": {
+            "type": "string",
+            "description": "Crew type",
+            "example": "CC"
+          },
+          "displayOrder": {
+            "type": "integer",
+            "description": "Display order",
+            "example": 1
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "Completion status",
+            "example": true
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "Created by user",
+            "example": "admin"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Created At timestamp  ",
+            "example": "2026-04-01T10:30:00.000Z "
+          },
+          "remarks": {
+            "type": "array",
+            "description": "Saved remarks ",
+            "items": { "$ref": "#/components/schemas/ActionRemark" }
+          },
+          "flightTaskAction": {
+            "type": "array",
+            "description": "The flight task action value (if any)",
+            "items": {
+              "$ref": "#/components/schemas/GetFlightTaskActionResponse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "aircraftType",
+          "type",
+          "name",
+          "crewType",
+          "displayOrder",
+          "completed",
+          "createdBy",
+          "completedAt",
+          "remarks",
+          "flightTaskAction"
+        ]
+      },
+      "ActionRemark": {
+        "type": "object",
+        "description": "The Flight Task Action Remark Value",
+        "properties": {
+          "remark": {
+            "type": "string",
+            "description": "reason for uncheck",
+            "example": "Clicked by mistake"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp for the reason given",
+            "example": "2026-03-26T10:00:00Z"
+          }
+        }
+      },
+      "GetFlightTaskActionResponse": {
+        "type": "object",
+        "description": "The Flight Task Action Values",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Type of flight task action values input",
+            "example": "Water level"
+          },
+          "value": {
+            "type": "integer",
+            "description": "Type of flight task action values input",
+            "example": 50
+          }
+        }
       },
       "CrewPosition": {
         "type": "object",
@@ -1408,8 +1804,7 @@
                 },
                 "expiryDate": {
                   "type": "string",
-                  "format": "date",
-                  "description": "Document expiry date"
+                  "description": "Document expiry date (empty if not available)"
                 },
                 "status": {
                   "type": "string",
@@ -1509,6 +1904,16 @@
           }
         }
       },
+      "PassengerStatus": {
+        "type": "string",
+        "enum": ["SUCCESS", "PARTIAL_SUCCESS", "FAILED"],
+        "description": "Overall save status across all remarks."
+      },
+      "RemarkStatus": {
+        "type": "string",
+        "enum": ["success", "failed"],
+        "description": "Save outcome for an individual remark."
+      },
       "PassengerRemark": {
         "type": "object",
         "description": "A single remark submitted for a passenger.",
@@ -1522,11 +1927,7 @@
             "format": "date-time",
             "description": "Timestamp when the remark was submitted by crew/staff. Maps to passenger_remarks.submitted_at."
           },
-          "status": {
-            "type": "string",
-            "enum": ["success", "fail"],
-            "description": "Save outcome for this remark (used in response)."
-          }
+          "status": { "$ref": "#/components/schemas/RemarkStatus" }
         },
         "required": ["text", "submittedAt"]
       },
@@ -1561,18 +1962,22 @@
       "PassengerRemarksResponse": {
         "type": "object",
         "description": "Response payload summarizing save results for passenger remarks.",
+        "required": ["data"],
         "properties": {
           "data": {
             "type": "object",
             "description": "Consolidated response data.",
+            "required": ["status", "summary", "passengers"],
             "properties": {
-              "status": {
-                "type": "string",
-                "enum": ["SUCCESS", "PARTIAL_SUCCESS", "FAILED"],
-                "description": "Overall save status across all remarks."
-              },
+              "status": { "$ref": "#/components/schemas/PassengerStatus" },
               "summary": {
                 "type": "object",
+                "required": [
+                  "totalPassengers",
+                  "totalRemarks",
+                  "saved",
+                  "failed"
+                ],
                 "description": "Aggregated counts of passengers and remarks processed.",
                 "properties": {
                   "totalPassengers": { "type": "integer" },
@@ -1586,6 +1991,7 @@
                 "description": "Detailed per-passenger save status.",
                 "items": {
                   "type": "object",
+                  "required": ["uci", "remarks"],
                   "properties": {
                     "uci": {
                       "type": "string",
@@ -1601,11 +2007,9 @@
                   }
                 }
               }
-            },
-            "required": ["status", "summary", "passengers"]
+            }
           }
-        },
-        "required": ["data"]
+        }
       }
     },
     "responses": {
