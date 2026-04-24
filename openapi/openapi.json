@@ -1685,6 +1685,12 @@
             "description": "Help or guidance text",
             "example": "Not available"
           },
+          "tag": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Flight Readiness",
+            "example": 1
+          },
           "crewType": {
             "type": "string",
             "description": "Crew type",
