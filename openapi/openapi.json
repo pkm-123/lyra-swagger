@@ -13,7 +13,7 @@
     {
       "url": "https://sandbox-dsp.malaysiaairlines.com/lyra",
       "variables": {},
-      "x-env": "staging"
+      "x-env": "uat"
     },
     {
       "url": "https://sandbox-dsp.malaysiaairlines.com/dev/lyra",
@@ -1703,16 +1703,19 @@
           },
           "completed": {
             "type": "boolean",
+            "nullable": true,
             "description": "Completion status",
             "example": true
           },
           "createdBy": {
             "type": "string",
+            "nullable": true,
             "description": "Created by user",
             "example": "admin"
           },
           "completedAt": {
             "type": "string",
+            "nullable": true,
             "format": "date-time",
             "description": "Created At timestamp  ",
             "example": "2026-04-01T10:30:00.000Z "
@@ -1756,6 +1759,7 @@
           },
           "completedAt": {
             "type": "string",
+            "nullable": true,
             "format": "date-time",
             "description": "Timestamp for the reason given",
             "example": "2026-03-26T10:00:00Z"
@@ -1828,12 +1832,23 @@
             }
           },
           "position": {
-            "type": "string",
-            "description": "Assigned crew position"
-          },
-          "responsibility": {
-            "type": "string",
-            "description": "Crew responsibility description"
+            "type": "object",
+            "nullable": true,
+            "description": "Assigned crew position details",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "Unique position identifier"
+              },
+              "position": {
+                "type": "string",
+                "description": "Crew position code (e.g., BC1)"
+              },
+              "responsibility": {
+                "type": "string",
+                "description": "Crew responsibility description"
+              }
+            }
           }
         }
       },
